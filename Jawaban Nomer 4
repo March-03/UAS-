@@ -1,0 +1,233 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// Struktur untuk metadata file
+typedef struct {
+    char fileName[100];
+    char filePath[200];
+    int fileSize;
+    char creationDate[20];
+    char lastModifiedDate[20];
+    char fileType[10];
+    char permissions[10];
+    char owner[50];
+    char checksum[50];
+} Metadata;
+
+// Struktur untuk node AVL Tree
+typedef struct Node {
+    Metadata metadata;
+    struct Node* left;
+    struct Node* right;
+    int height;
+} Node;
+
+// Fungsi untuk mendapatkan ketinggian node
+int height(Node* node) {
+    if (node == NULL)
+        return 0;
+    return node->height;
+}
+
+// Fungsi untuk mendapatkan nilai maksimum dari dua bilangan
+int max(int a, int b) {
+    return (a > b) ? a : b;
+}
+
+// Fungsi untuk membuat node baru
+Node* createNode(Metadata metadata) {
+    Node* node = (Node*)malloc(sizeof(Node));
+    node->metadata = metadata;
+    node->left = NULL;
+    node->right = NULL;
+    node->height = 1;
+    return node;
+}
+
+// Rotasi kanan
+Node* rightRotate(Node* y) {
+    Node* x = y->left;
+    Node* T2 = x->right;
+
+    x->right = y;
+    y->left = T2;
+
+    y->height = max(height(y->left), height(y->right)) + 1;
+    x->height = max(height(x->left), height(x->right)) + 1;
+
+    return x;
+}
+
+// Rotasi kiri
+Node* leftRotate(Node* x) {
+    Node* y = x->right;
+    Node* T2 = y->left;
+
+    y->left = x;
+    x->right = T2;
+
+    x->height = max(height(x->left), height(x->right)) + 1;
+    y->height = max(height(y->left), height(y->right)) + 1;
+
+    return y;
+}
+
+// Mendapatkan balance factor dari node
+int getBalance(Node* node) {
+    if (node == NULL)
+        return 0;
+    return height(node->left) - height(node->right);
+}
+
+// Fungsi untuk memasukkan metadata ke dalam AVL Tree
+Node* insert(Node* node, Metadata metadata) {
+    if (node == NULL)
+        return createNode(metadata);
+
+    if (strcmp(metadata.fileName, node->metadata.fileName) < 0)
+        node->left = insert(node->left, metadata);
+    else if (strcmp(metadata.fileName, node->metadata.fileName) > 0)
+        node->right = insert(node->right, metadata);
+    else
+        return node;
+
+    node->height = 1 + max(height(node->left), height(node->right));
+
+    int balance = getBalance(node);
+
+    if (balance > 1 && strcmp(metadata.fileName, node->left->metadata.fileName) < 0)
+        return rightRotate(node);
+
+    if (balance < -1 && strcmp(metadata.fileName, node->right->metadata.fileName) > 0)
+        return leftRotate(node);
+
+    if (balance > 1 && strcmp(metadata.fileName, node->left->metadata.fileName) > 0) {
+        node->left = leftRotate(node->left);
+        return rightRotate(node);
+    }
+
+    if (balance < -1 && strcmp(metadata.fileName, node->right->metadata.fileName) < 0) {
+        node->right = rightRotate(node->right);
+        return leftRotate(node);
+    }
+
+    return node;
+}
+
+// Fungsi untuk mencari node dengan nilai minimum
+Node* minValueNode(Node* node) {
+    Node* current = node;
+    while (current->left != NULL)
+        current = current->left;
+    return current;
+}
+
+// Fungsi untuk menghapus node dari AVL Tree
+Node* deleteNode(Node* root, char* fileName) {
+    if (root == NULL)
+        return root;
+
+    if (strcmp(fileName, root->metadata.fileName) < 0)
+        root->left = deleteNode(root->left, fileName);
+    else if (strcmp(fileName, root->metadata.fileName) > 0)
+        root->right = deleteNode(root->right, fileName);
+    else {
+        if ((root->left == NULL) || (root->right == NULL)) {
+            Node* temp = root->left ? root->left : root->right;
+            if (temp == NULL) {
+                temp = root;
+                root = NULL;
+            } else
+                *root = *temp;
+            free(temp);
+        } else {
+            Node* temp = minValueNode(root->right);
+            root->metadata = temp->metadata;
+            root->right = deleteNode(root->right, temp->metadata.fileName);
+        }
+    }
+
+    if (root == NULL)
+        return root;
+
+    root->height = 1 + max(height(root->left), height(root->right));
+
+    int balance = getBalance(root);
+
+    if (balance > 1 && getBalance(root->left) >= 0)
+        return rightRotate(root);
+
+    if (balance > 1 && getBalance(root->left) < 0) {
+        root->left = leftRotate(root->left);
+        return rightRotate(root);
+    }
+
+    if (balance < -1 && getBalance(root->right) <= 0)
+        return leftRotate(root);
+
+    if (balance < -1 && getBalance(root->right) > 0) {
+        root->right = rightRotate(root->right);
+        return leftRotate(root);
+    }
+
+    return root;
+}
+
+// Fungsi untuk mencari metadata berdasarkan nama file
+Node* search(Node* root, char* fileName) {
+    if (root == NULL || strcmp(root->metadata.fileName, fileName) == 0)
+        return root;
+
+    if (strcmp(fileName, root->metadata.fileName) < 0)
+        return search(root->left, fileName);
+
+    return search(root->right, fileName);
+}
+
+// Fungsi untuk menampilkan metadata
+void displayMetadata(Metadata metadata) {
+    printf("File Name: %s\n", metadata.fileName);
+    printf("File Path: %s\n", metadata.filePath);
+    printf("File Size: %d bytes\n", metadata.fileSize);
+    printf("Creation Date: %s\n", metadata.creationDate);
+    printf("Last Modified Date: %s\n", metadata.lastModifiedDate);
+    printf("File Type: %s\n", metadata.fileType);
+    printf("Permissions: %s\n", metadata.permissions);
+    printf("Owner: %s\n", metadata.owner);
+    printf("Checksum: %s\n", metadata.checksum);
+    printf("--------------------------\n");
+}
+
+int main() {
+    Node* root = NULL;
+
+    Metadata file1 = {"file1.txt", "/home/user/file1.txt", 1024, "2024-01-01", "2024-01-02", ".txt", "rw", "user1", "abc123"};
+    Metadata file2 = {"file2.txt", "/home/user/file2.txt", 2048, "2024-01-03", "2024-01-04", ".txt", "rw", "user2", "def456"};
+    Metadata file3 = {"file3.txt", "/home/user/file3.txt", 4096, "2024-01-05", "2024-01-06", ".txt", "rw", "user3", "ghi789"};
+
+    root = insert(root, file1);
+    root = insert(root, file2);
+    root = insert(root, file3);
+
+    printf("Searching for file2.txt:\n");
+    Node* result = search(root, "file2.txt");
+    if (result != NULL) {
+        displayMetadata(result->metadata);
+    } else {
+        printf("File not found.\n");
+    }
+
+    printf("Deleting file2.txt...\n");
+    root = deleteNode(root, "file2.txt");
+
+    printf("Searching for file2.txt after deletion:\n");
+    result = search(root, "file2.txt");
+    if (result != NULL) {
+        displayMetadata(result->metadata);
+    } else {
+        printf("File not found.\n");
+    }
+
+    return 0;
+}
